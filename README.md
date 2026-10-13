@@ -38,16 +38,21 @@ Odysseus is a FastAPI application that keeps its data in SQLite and files on dis
 | ChromaDB | `chromadb/chroma:1.5.9` | Vector memory, document retrieval and semantic skills; private, volume `/data` |
 | SearXNG | `searxng/searxng:2026.10.13-22c64b8d3` with JSON output enabled | Web search for chat and deep research; private |
 | ntfy | `binwiederhier/ntfy:v2.30.0` with provisioned users | Reminder and alert delivery; public URL, anonymous access denied, volume `/var/lib/ntfy` |
-| Ollama | `ollama/ollama:0.40.3`, model `qwen3:1.7b` pulled on first boot | Local chat model on CPU; private, volume `/root/.ollama` |
+| Ollama | `ollama/ollama:0.40.3`; pulls `qwen3:1.7b` and creates the tuned `qwen3-cpu:1.7b` | Local chat model on CPU, threads sized to the service's vCPU limit, thinking off; private, volume `/root/.ollama` |
 
 **First login**
 
 1. Optional: paste `LLM_PROVIDER_API_KEY` (and `LLM_PROVIDER_BASE_URL` / `LLM_PROVIDER_MODEL` for providers other than OpenAI) when deploying.
 2. Open the Odysseus URL and sign in as `admin` with `ODYSSEUS_ADMIN_PASSWORD` from the Odysseus service's Variables tab. Change the password under Settings.
-3. The first boot downloads the local model (about 1.4 GB). The Ollama endpoint appears in the model menu a few minutes after deploy. The local model runs on CPU, so expect replies in tens of seconds. Add an API provider for fast answers.
+3. The first boot downloads the local model (about 1.4 GB). The Ollama endpoint and `qwen3-cpu:1.7b` appear in the model menu a few minutes after deploy. Pick `qwen3-cpu:1.7b` rather than the plain `qwen3:1.7b`, which keeps qwen3's slow reasoning phase.
 4. Alerts: install the ntfy app, add the server `https://{ntfy-domain}`, sign in with `NTFY_ADMIN_USER` / `NTFY_ADMIN_PASSWORD` from the ntfy service, and subscribe to the topic `odysseus`. Reminders from notes and tasks are delivered there and in the browser. On iPhone, set `NTFY_UPSTREAM_BASE_URL` to `https://ntfy.sh` for instant delivery.
 
-**Scaling**: Odysseus keeps SQLite and files on its volume, so it runs as one replica; raise its RAM or CPU instead. Ollama speed depends on vCPUs; give it more CPU or switch `OLLAMA_DEFAULT_MODEL` to a larger model if you raise its memory. ChromaDB, SearXNG and ntfy are light.
+**Local model speed**: the bundled model runs on CPU without a GPU. Expect a short answer in roughly 10 to 40 seconds on 8 vCPUs; agent turns with tools or web search take longer. For fast, stronger answers, set `LLM_PROVIDER_API_KEY` (plus `LLM_PROVIDER_BASE_URL` and `LLM_PROVIDER_MODEL` for providers other than OpenAI) and redeploy Odysseus, or add a provider under Settings. The local model then stays available for private chats.
+
+- Threads: at every start the Ollama service sizes its thread pool to its CPU quota, at most 8 threads, because more threads than the CPU time actually granted stall generation. Override with `OLLAMA_NUM_THREAD`.
+- Thinking: qwen3 normally reasons silently before it answers, which on CPU can add a minute or more per answer. `qwen3-cpu:1.7b` answers directly. To turn reasoning back on, set `OLLAMA_THINKING=true` on the Ollama service and redeploy it.
+
+**Scaling**: Odysseus keeps SQLite and files on its volume, so it runs as one replica; raise its RAM or CPU instead. Ollama speed depends on vCPUs; give it more CPU, or set `OLLAMA_BASE_MODEL` to a larger model (for example `qwen3:4b`, renaming `OLLAMA_DEFAULT_MODEL` to match) if you raise its memory. ChromaDB, SearXNG and ntfy are light.
 
 **Pinning and upgrades**: the Odysseus image tag and digest are in `services/odysseus/Dockerfile`; the other images are pinned in their Dockerfiles or in the service source. Back up the Odysseus volume, change the tag and digest to a newer release, and redeploy. Upstream's `:latest` and bare version tags move on every push, so keep the digest.
 

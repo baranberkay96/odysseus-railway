@@ -99,12 +99,12 @@
         },
         "OLLAMA_MODEL": {
           "defaultValue": "${{Ollama.OLLAMA_DEFAULT_MODEL}}",
-          "description": "Ollama model that becomes the default chat model when no LLM_PROVIDER model is configured.",
+          "description": "Tuned Ollama model registered on first boot; it becomes the default chat model unless LLM_PROVIDER_MODEL is set or you picked another default.",
           "required": false
         },
         "LLM_PROVIDER_API_KEY": {
           "defaultValue": "",
-          "description": "Optional. API key of an OpenAI-compatible provider (OpenAI, OpenRouter, Groq, ...). When set, the provider is registered as a model endpoint on boot. More providers can be added in Settings.",
+          "description": "Optional, recommended for fast answers. API key of an OpenAI-compatible provider (OpenAI, OpenRouter, Groq, ...). When set, the provider is registered as a model endpoint on boot. More providers can be added in Settings.",
           "required": false
         },
         "LLM_PROVIDER_BASE_URL": {
@@ -371,19 +371,39 @@
           "description": "Bind address (IPv4 + IPv6).",
           "required": false
         },
-        "OLLAMA_DEFAULT_MODEL": {
+        "OLLAMA_BASE_MODEL": {
           "defaultValue": "qwen3:1.7b",
-          "description": "Local chat model pulled on first boot (1.4 GB, tool calling, CPU-friendly). Odysseus uses it until you add a provider.",
+          "description": "Library model pulled on first boot (1.4 GB, Q4_K_M, tool calling, CPU-friendly).",
+          "required": false
+        },
+        "OLLAMA_DEFAULT_MODEL": {
+          "defaultValue": "qwen3-cpu:1.7b",
+          "description": "Tuned copy of OLLAMA_BASE_MODEL that Odysseus uses: CPU thread count, OLLAMA_CONTEXT_LENGTH and (for qwen3) thinking off. Recreated on every start.",
           "required": false
         },
         "OLLAMA_PULL_MODELS": {
-          "defaultValue": "${{OLLAMA_DEFAULT_MODEL}}",
+          "defaultValue": "${{OLLAMA_BASE_MODEL}}",
           "description": "Models pulled on first boot (comma-separated).",
+          "required": false
+        },
+        "OLLAMA_THINKING": {
+          "defaultValue": "false",
+          "description": "false: qwen3 answers directly, without a hidden reasoning phase (much faster on CPU). true: keep the model's own template, so qwen3 reasons before every answer. Redeploy Ollama after changing.",
+          "required": false
+        },
+        "OLLAMA_NUM_THREAD": {
+          "defaultValue": "",
+          "description": "Optional. CPU threads for inference. Empty: this service's CPU quota, at most 8 (more threads than granted CPU time stall generation on shared hosts).",
+          "required": false
+        },
+        "OLLAMA_GO_TEMPLATE": {
+          "defaultValue": "1",
+          "description": "Render chats with each model's Modelfile TEMPLATE (needed for the thinking-off template; otherwise Ollama may use the GGUF's embedded template).",
           "required": false
         },
         "OLLAMA_CONTEXT_LENGTH": {
           "defaultValue": "16384",
-          "description": "Context window: room for Odysseus' tool schemas, memory and search results.",
+          "description": "Context window (num_ctx): room for Odysseus' tool instructions, memory and search results.",
           "required": false
         },
         "OLLAMA_FLASH_ATTENTION": {

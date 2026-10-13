@@ -10,9 +10,9 @@ applies each step at most once (a marker file per step under
                      authenticated with the provisioned access token, and the
                      reminder channel switched to ntfy
 * model endpoints -> an OpenAI-compatible provider from LLM_PROVIDER_* and the
-                     bundled Ollama service; the first one with a named model
-                     (LLM_PROVIDER_MODEL, then OLLAMA_MODEL) becomes the
-                     default chat model when none is set
+                     bundled Ollama service. The default chat model becomes
+                     LLM_PROVIDER_MODEL when set, else OLLAMA_MODEL, unless the
+                     current default was chosen by the user in Settings
 
 Everything the user later changes in Settings wins: a step that already ran is
 never repeated, and a step whose admin login fails (password changed) is
@@ -32,6 +32,7 @@ from typing import Any, Optional
 
 BASE_URL = "http://127.0.0.1:7000"
 STATE_DIR = "/app/data/.railway-bootstrap"
+DEFAULT_RECORD = "default-model"
 HEALTH_TIMEOUT_SECONDS = 1200
 
 
@@ -116,17 +117,44 @@ def is_done(step: str) -> bool:
     return os.path.exists(marker_path(step))
 
 
-def mark_done(step: str) -> None:
+def write_state(filename: str, content: str) -> None:
     os.makedirs(STATE_DIR, exist_ok=True)
-    path = marker_path(step)
+    path = os.path.join(STATE_DIR, filename)
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + "\n")
+        fh.write(content)
     uid, gid = int(env("PUID", "1000")), int(env("PGID", "1000"))
     for target in (STATE_DIR, path):
         try:
             os.chown(target, uid, gid)
         except OSError:
             pass
+
+
+def mark_done(step: str) -> None:
+    write_state(f"{step}.done", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + "\n")
+
+
+def recorded_default() -> str:
+    try:
+        with open(os.path.join(STATE_DIR, DEFAULT_RECORD), encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return ""
+
+
+def default_is_ours(current: str) -> bool:
+    """True when the current default chat model was set by this bootstrap.
+
+    Covers the recorded value and, for installs bootstrapped before the
+    record existed, an Ollama model whose registration marker is present.
+    A default the user picked in Settings is never replaced.
+    """
+    if not current:
+        return True
+    if current == recorded_default():
+        return True
+    ollama_url = env("OLLAMA_BASE_URL").rstrip("/")
+    return bool(ollama_url) and is_done(ollama_step_name(ollama_url, current))
 
 
 def get_settings(api: Api) -> dict:
@@ -203,7 +231,14 @@ def ollama_has_model(ollama_url: str, model: str) -> bool:
 
 
 def register_endpoint(
-    api: Api, step: str, name: str, base_url: str, api_key: str, model: str, kind: str
+    api: Api,
+    step: str,
+    name: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    kind: str,
+    make_default: bool,
 ) -> None:
     if is_done(step):
         return
@@ -222,11 +257,16 @@ def register_endpoint(
         log(f"registering model endpoint '{name}' failed (HTTP {status}) {detail}".strip())
         return
     log(f"model endpoint '{name}' registered ({base_url})")
-    chosen = model  # only an explicitly named model becomes the default
-    settings = get_settings(api)
-    if chosen and not settings.get("default_model"):
-        if save_settings(api, {"default_endpoint_id": body["id"], "default_model": chosen}):
-            log(f"default chat model set to '{chosen}' on '{name}'")
+    if make_default and model:
+        settings = get_settings(api)
+        current = settings.get("default_model") or ""
+        if not default_is_ours(current):
+            log(f"default chat model '{current}' was chosen in Settings; left unchanged")
+        elif current == model and settings.get("default_endpoint_id") == body["id"]:
+            write_state(DEFAULT_RECORD, model + "\n")
+        elif save_settings(api, {"default_endpoint_id": body["id"], "default_model": model}):
+            write_state(DEFAULT_RECORD, model + "\n")
+            log(f"default chat model set to '{model}' on '{name}'")
     mark_done(step)
 
 
@@ -240,13 +280,17 @@ def llm_provider_step() -> Optional[tuple[str, str, str, str, str]]:
     return f"llm-{digest}", host, base_url, api_key, env("LLM_PROVIDER_MODEL")
 
 
+def ollama_step_name(ollama_url: str, model: str) -> str:
+    digest = hashlib.sha256(f"{ollama_url}|{model}".encode()).hexdigest()[:12]
+    return f"ollama-{digest}"
+
+
 def ollama_step() -> Optional[tuple[str, str, str]]:
     ollama_url = env("OLLAMA_BASE_URL").rstrip("/")
     model = env("OLLAMA_MODEL")
     if not ollama_url or not model:
         return None
-    digest = hashlib.sha256(f"{ollama_url}|{model}".encode()).hexdigest()[:12]
-    return f"ollama-{digest}", ollama_url, model
+    return ollama_step_name(ollama_url, model), ollama_url, model
 
 
 def pending_steps() -> list[str]:
@@ -268,7 +312,7 @@ def run_llm_provider(api: Api) -> None:
     llm = llm_provider_step()
     if llm:
         step, host, base_url, api_key, model = llm
-        register_endpoint(api, step, host, base_url, api_key, model, "api")
+        register_endpoint(api, step, host, base_url, api_key, model, "api", make_default=bool(model))
 
 
 def run_ollama(api: Api) -> None:
@@ -284,7 +328,13 @@ def run_ollama(api: Api) -> None:
             log(f"Ollama model '{model}' not available yet; will retry on next start")
             return
         time.sleep(15)
-    register_endpoint(api, step, "Ollama (Railway)", f"{ollama_url}/v1", "", model, "local")
+    # A named provider model (LLM_PROVIDER_MODEL) takes precedence as default.
+    llm = llm_provider_step()
+    provider_default = bool(llm and llm[4])
+    register_endpoint(
+        api, step, "Ollama (Railway)", f"{ollama_url}/v1", "", model, "local",
+        make_default=not provider_default,
+    )
 
 
 def main() -> int:

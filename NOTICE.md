@@ -8,7 +8,7 @@
 | ChromaDB | `chromadb/chroma:1.5.9` | Apache-2.0 | Run unmodified |
 | SearXNG | `searxng/searxng:2026.10.13-22c64b8d3` | AGPL-3.0 | Run unmodified with a settings file written for this template |
 | ntfy | `binwiederhier/ntfy:v2.30.0` | Apache-2.0 or GPL-2.0 (dual) | Run unmodified behind a start script written for this template |
-| Ollama | `ollama/ollama:0.40.3` | MIT | Run unmodified behind a start script written for this template |
+| Ollama | `ollama/ollama:0.40.3` | MIT | Run unmodified behind a start script written for this template; a derived model uses an adapted copy of Ollama's qwen3 chat template (see below) |
 | Qwen3 1.7B model | Ollama library `qwen3:1.7b`, pulled at runtime | Apache-2.0 | Downloaded by the Ollama service on first boot, not redistributed here |
 | all-MiniLM-L6-v2 (FastEmbed) | Hugging Face, downloaded by Odysseus at runtime | Apache-2.0 | Upstream default embedding model |
 
@@ -23,10 +23,12 @@ All files were written for this template:
 - `services/odysseus/Dockerfile`, `railway/start.sh`, `railway/wait_http.py`, `railway/bootstrap.py`: volume layout, ChromaDB wait, admin-password guard, and a one-time bootstrap through Odysseus' own API (`/api/auth/login`, `/api/auth/settings`, `/api/auth/integrations`, `/api/model-endpoints`).
 - `services/searxng/Dockerfile`, `settings.yml`: SearXNG defaults plus JSON output. Upstream Odysseus ships an equivalent minimal settings file (`config/searxng/settings.yml`); this one was written independently and adds Railway-specific options (limiter and image proxy off, private-only instance).
 - `services/ntfy/Dockerfile`, `railway-start.sh`: hashes the generated passwords with `ntfy user hash` and provisions users, an ACL and the publish token through ntfy's documented `NTFY_AUTH_USERS` / `NTFY_AUTH_ACCESS` / `NTFY_AUTH_TOKENS` options.
-- `services/ollama/Dockerfile`, `railway-entrypoint.sh`: first-boot model pull (same approach as this template collection's Open WebUI + Ollama package).
+- `services/ollama/Dockerfile`, `railway-entrypoint.sh`: thread count from the cgroup CPU quota, first-boot model pull (same approach as this template collection's Open WebUI + Ollama package) and creation of the tuned `qwen3-cpu:1.7b` model.
+- `services/ollama/qwen3-nothink.tmpl`: adapted from the chat template that Ollama publishes with its library model `qwen3:1.7b` (template blob `sha256:ae370d88…`). The thinking switch is fixed to off and the thinking fields are removed; the rest of the text is unchanged. The template is Ollama's work; Ollama is MIT-licensed.
 
 ## Upstream files and docs checked (2026-10-13)
 
+- Ollama `v0.40.3` (commit `eab97e9f`): `envconfig/config.go`, `openai/openai.go`, `middleware/openai.go`, `server/routes.go`, `server/images.go`, `server/model_thinking.go`, `server/create.go`, `create/manifest.go`, `parser/parser.go`, `template/template.go`, `thinking/template.go`, `llm/llama_server.go`, `LLAMA_CPP_VERSION` (b11351); llama.cpp `b11351` `common/arg.cpp` (`LLAMA_ARG_THREADS`). Ollama library `qwen3:1.7b` manifest, template, params and config blobs.
 - `odysseus-dev/odysseus` default branch `dev` (local copy) and `main` (release branch, `APP_VERSION = "1.0.3"` in `src/constants.py`, commit `934d23c`, 2026-09-05): `docker-compose.yml`, `Dockerfile`, `docker/entrypoint.sh`, `setup.py`, `app.py` (auth exemptions, `/api/health`, `/api/ready`), `.env.example`, `src/constants.py`, `src/chroma_client.py`, `src/memory_vector.py`, `src/app_initializer.py`, `src/model_discovery.py`, `src/llm_core.py` (Ollama `think: false` handling), `src/integrations.py`, `src/settings.py`, `src/url_safety.py`, `src/readiness.py`, `core/auth.py`, `core/middleware.py`, `routes/auth_routes.py`, `routes/model_routes.py`, `routes/note/note_routes.py`, `services/search/providers.py`, `config/searxng/settings.yml`, `.github/workflows/docker-publish.yml` (tag scheme), `SECURITY.md`, `website/setup.md`, `website/configuration-reference.md`.
 - GHCR tag list for `ghcr.io/odysseus-dev/odysseus`: `latest` = `1.0.3` = digest `sha256:4aa6e607…`, created 2026-09-05. The documented immutable `X.Y.Z-<sha>` main tags are not published for 1.0.3, hence the digest pin.
 - ChromaDB release 1.5.9 (GitHub release, 2026-05-05; `latest` points to it); PyPI `chromadb-client` 1.5.9 is the newest client, matching the server.
