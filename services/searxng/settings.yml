@@ -1,0 +1,20 @@
+# SearXNG settings for Odysseus on Railway: SearXNG's defaults plus the JSON
+# output Odysseus queries (/search?format=json). Reachable only on the Railway
+# private network, so the bot limiter (which would need Valkey) stays off.
+# server.secret_key is overridden at runtime by the SEARXNG_SECRET variable.
+use_default_settings: true
+
+general:
+  instance_name: "Odysseus search"
+  enable_metrics: false
+
+server:
+  secret_key: "overridden-by-SEARXNG_SECRET"
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json

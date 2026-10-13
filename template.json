@@ -1,0 +1,418 @@
+{
+  "name": "Odysseus v1 Private AI Workspace",
+  "description": "Self-hosted AI workspace with web search, vector memory and alerts.",
+  "category": "AI/ML",
+  "tags": [
+    "odysseus",
+    "ai-workspace",
+    "ai-agents",
+    "llm",
+    "ollama",
+    "searxng",
+    "chromadb",
+    "ntfy",
+    "self-hosted",
+    "rag"
+  ],
+  "image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/odysseus.svg",
+  "upstream": {
+    "repo": "odysseus-dev/odysseus",
+    "version": "1.0.3 (image ghcr.io/odysseus-dev/odysseus:1.0.3@sha256:4aa6e607d2108bd7b5f37ee1a0841dc56e6bbac36e9ccd5e1705aff7ea36fb04, main commit 934d23c, built 2026-09-05)",
+    "checked": "2026-10-13"
+  },
+  "services": {
+    "Odysseus": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/odysseus.svg",
+      "source": {
+        "repo": "baranberkay96/odysseus-railway",
+        "rootDirectory": "/services/odysseus"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/api/health",
+      "healthcheckTimeout": 900,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": true,
+      "targetPort": 7000,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/app/data"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "7000",
+          "description": "Port uvicorn listens on (0.0.0.0). Railway routes the public domain and the /api/health check here.",
+          "required": false
+        },
+        "ODYSSEUS_ADMIN_USER": {
+          "defaultValue": "admin",
+          "description": "Username of the admin account created on first boot.",
+          "required": false
+        },
+        "ODYSSEUS_ADMIN_PASSWORD": {
+          "defaultValue": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Admin password, generated at deploy. Used only to create the admin on first boot (and by the one-time bootstrap); change it later in Settings.",
+          "required": false
+        },
+        "AUTH_ENABLED": {
+          "defaultValue": "true",
+          "description": "Keep true: login required for the web UI and API. false would expose shell, file and agent tools to anyone with the URL.",
+          "required": false
+        },
+        "LOCALHOST_BYPASS": {
+          "defaultValue": "false",
+          "description": "Keep false: loopback requests must authenticate too (upstream: development only).",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "sqlite:////app/data/app.db",
+          "description": "SQLite database for sessions, messages, documents and model endpoints, on the /app/data volume.",
+          "required": false
+        },
+        "CHROMADB_HOST": {
+          "defaultValue": "${{ChromaDB.RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Private hostname of the ChromaDB vector store (memory vectors, RAG, semantic skills).",
+          "required": false
+        },
+        "CHROMADB_PORT": {
+          "defaultValue": "${{ChromaDB.PORT}}",
+          "description": "ChromaDB port.",
+          "required": false
+        },
+        "CHROMADB_CONNECT_TIMEOUT": {
+          "defaultValue": "5.0",
+          "description": "Seconds for the ChromaDB connect probe at startup.",
+          "required": false
+        },
+        "SEARXNG_INSTANCE": {
+          "defaultValue": "http://${{SearXNG.RAILWAY_PRIVATE_DOMAIN}}:${{SearXNG.PORT}}",
+          "description": "Private SearXNG URL used for web search and deep research.",
+          "required": false
+        },
+        "OLLAMA_BASE_URL": {
+          "defaultValue": "http://${{Ollama.RAILWAY_PRIVATE_DOMAIN}}:${{Ollama.PORT}}",
+          "description": "Private URL of the bundled Ollama service. Registered as a model endpoint on first boot.",
+          "required": false
+        },
+        "OLLAMA_MODEL": {
+          "defaultValue": "${{Ollama.OLLAMA_DEFAULT_MODEL}}",
+          "description": "Ollama model that becomes the default chat model when no LLM_PROVIDER model is configured.",
+          "required": false
+        },
+        "LLM_PROVIDER_API_KEY": {
+          "defaultValue": "",
+          "description": "Optional. API key of an OpenAI-compatible provider (OpenAI, OpenRouter, Groq, ...). When set, the provider is registered as a model endpoint on boot. More providers can be added in Settings.",
+          "required": false
+        },
+        "LLM_PROVIDER_BASE_URL": {
+          "defaultValue": "https://api.openai.com/v1",
+          "description": "Optional. OpenAI-compatible base URL for LLM_PROVIDER_API_KEY, e.g. https://openrouter.ai/api/v1.",
+          "required": false
+        },
+        "LLM_PROVIDER_MODEL": {
+          "defaultValue": "",
+          "description": "Optional. Model id on that provider (e.g. gpt-5-mini, or openai/gpt-5-mini on OpenRouter). When set it becomes the default chat model instead of the local Ollama model; otherwise pick a model in the chat model menu.",
+          "required": false
+        },
+        "NTFY_INTERNAL_URL": {
+          "defaultValue": "http://${{ntfy.RAILWAY_PRIVATE_DOMAIN}}:${{ntfy.PORT}}",
+          "description": "Private ntfy URL. Added as the ntfy integration for reminders on first boot.",
+          "required": false
+        },
+        "NTFY_PUBLISH_TOKEN": {
+          "defaultValue": "${{ntfy.NTFY_ODYSSEUS_TOKEN}}",
+          "description": "Write-only ntfy access token Odysseus publishes reminders with (stored encrypted in Odysseus).",
+          "required": false
+        },
+        "NTFY_TOPIC": {
+          "defaultValue": "odysseus",
+          "description": "ntfy topic for reminders and alerts. Subscribe to it in the ntfy app.",
+          "required": false
+        },
+        "ALLOWED_ORIGINS": {
+          "defaultValue": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "Exact origins allowed for cross-origin API clients.",
+          "required": false
+        },
+        "OAUTH_REDIRECT_BASE_URL": {
+          "defaultValue": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "External origin for remote MCP server OAuth callbacks.",
+          "required": false
+        },
+        "GOOGLE_OAUTH_REDIRECT_URI": {
+          "defaultValue": "https://${{RAILWAY_PUBLIC_DOMAIN}}/api/email/oauth/google/callback",
+          "description": "Gmail OAuth redirect URI (Railway's proxy is not on a trusted address, so it is pinned here). Only used if you connect Gmail.",
+          "required": false
+        },
+        "FASTEMBED_MODEL": {
+          "defaultValue": "sentence-transformers/all-MiniLM-L6-v2",
+          "description": "Local ONNX embedding model for memory and documents (upstream default, runs on CPU).",
+          "required": false
+        },
+        "FASTEMBED_CACHE_PATH": {
+          "defaultValue": "/app/data/fastembed",
+          "description": "Embedding model cache on the volume, so it is downloaded once.",
+          "required": false
+        },
+        "CLEANUP_INTERVAL_HOURS": {
+          "defaultValue": "24",
+          "description": "Interval of the built-in cleanup job.",
+          "required": false
+        },
+        "WAIT_FOR_SERVICES_SECONDS": {
+          "defaultValue": "300",
+          "description": "How long the start script waits for ChromaDB before starting Odysseus anyway.",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "20",
+          "description": "Grace period for in-flight requests and SQLite writes on redeploy.",
+          "required": false
+        }
+      }
+    },
+    "ChromaDB": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/chroma.svg",
+      "source": {
+        "image": "chromadb/chroma:1.5.9@sha256:1e0b73a187a28757c572acba508c46f48c9e8b0acaf5c20e6d95cdedce1acdf6"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/api/v2/heartbeat",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/data"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8000",
+          "description": "ChromaDB HTTP port (private). Railway's healthcheck probes /api/v2/heartbeat here.",
+          "required": false
+        },
+        "ANONYMIZED_TELEMETRY": {
+          "defaultValue": "FALSE",
+          "description": "Chroma product telemetry off (as in upstream compose).",
+          "required": false
+        }
+      }
+    },
+    "SearXNG": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/searxng.svg",
+      "source": {
+        "repo": "baranberkay96/odysseus-railway",
+        "rootDirectory": "/services/searxng"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/healthz",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "description": "SearXNG port (granian, dual-stack ::). Railway's healthcheck probes /healthz here.",
+          "required": false
+        },
+        "SEARXNG_SECRET": {
+          "defaultValue": "${{secret(48)}}",
+          "description": "SearXNG secret key (overrides server.secret_key), generated at deploy.",
+          "required": false
+        },
+        "SEARXNG_BASE_URL": {
+          "defaultValue": "http://${{RAILWAY_PRIVATE_DOMAIN}}:8080/",
+          "description": "Base URL SearXNG uses for its own links (private network only).",
+          "required": false
+        }
+      }
+    },
+    "ntfy": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/ntfy.svg",
+      "source": {
+        "repo": "baranberkay96/odysseus-railway",
+        "rootDirectory": "/services/ntfy"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/v1/health",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": true,
+      "targetPort": 8080,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/var/lib/ntfy"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "description": "ntfy HTTP port. Railway routes the public domain and the /v1/health check here.",
+          "required": false
+        },
+        "NTFY_LISTEN_HTTP": {
+          "defaultValue": ":8080",
+          "description": "ntfy listen address (Go, dual-stack).",
+          "required": false
+        },
+        "NTFY_BASE_URL": {
+          "defaultValue": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "Public URL of this ntfy server: use it as the server in the ntfy app.",
+          "required": false
+        },
+        "NTFY_BEHIND_PROXY": {
+          "defaultValue": "true",
+          "description": "Trust Railway's proxy headers for client IPs (rate limiting).",
+          "required": false
+        },
+        "NTFY_ADMIN_USER": {
+          "defaultValue": "admin",
+          "description": "ntfy login for the web app and the Android/iOS app.",
+          "required": false
+        },
+        "NTFY_ADMIN_PASSWORD": {
+          "defaultValue": "${{secret(24, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Password of NTFY_ADMIN_USER, generated at deploy.",
+          "required": false
+        },
+        "NTFY_ODYSSEUS_TOKEN": {
+          "defaultValue": "tk_${{secret(29, \"abcdefghijklmnopqrstuvwxyz0123456789\")}}",
+          "description": "Access token of the write-only 'odysseus' publisher user (ntfy format tk_ + 29 chars). Odysseus reads it by reference.",
+          "required": false
+        },
+        "NTFY_AUTH_FILE": {
+          "defaultValue": "/var/lib/ntfy/user.db",
+          "description": "User and access-control database, on the volume.",
+          "required": false
+        },
+        "NTFY_AUTH_DEFAULT_ACCESS": {
+          "defaultValue": "deny-all",
+          "description": "Anonymous users can neither read nor publish.",
+          "required": false
+        },
+        "NTFY_ENABLE_LOGIN": {
+          "defaultValue": "true",
+          "description": "Show the login in the ntfy web app.",
+          "required": false
+        },
+        "NTFY_REQUIRE_LOGIN": {
+          "defaultValue": "true",
+          "description": "The web app is only usable after login.",
+          "required": false
+        },
+        "NTFY_CACHE_FILE": {
+          "defaultValue": "/var/lib/ntfy/cache.db",
+          "description": "Message cache on the volume, so phones that were offline still get alerts after a redeploy.",
+          "required": false
+        },
+        "NTFY_CACHE_DURATION": {
+          "defaultValue": "72h",
+          "description": "How long messages are kept for clients that were offline.",
+          "required": false
+        },
+        "NTFY_ATTACHMENT_CACHE_DIR": {
+          "defaultValue": "/var/lib/ntfy/attachments",
+          "description": "Attachment storage on the volume.",
+          "required": false
+        },
+        "NTFY_UPSTREAM_BASE_URL": {
+          "defaultValue": "",
+          "description": "Optional. Set https://ntfy.sh for instant iOS push (ntfy.sh then relays a wake-up poll with only the message ID). Android and web need nothing.",
+          "required": false
+        }
+      }
+    },
+    "Ollama": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/ollama.svg",
+      "source": {
+        "repo": "baranberkay96/odysseus-railway",
+        "rootDirectory": "/services/ollama"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/",
+      "healthcheckTimeout": 600,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/root/.ollama"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "11434",
+          "description": "Ollama API port (private).",
+          "required": false
+        },
+        "OLLAMA_HOST": {
+          "defaultValue": "[::]:11434",
+          "description": "Bind address (IPv4 + IPv6).",
+          "required": false
+        },
+        "OLLAMA_DEFAULT_MODEL": {
+          "defaultValue": "qwen3:1.7b",
+          "description": "Local chat model pulled on first boot (1.4 GB, tool calling, CPU-friendly). Odysseus uses it until you add a provider.",
+          "required": false
+        },
+        "OLLAMA_PULL_MODELS": {
+          "defaultValue": "${{OLLAMA_DEFAULT_MODEL}}",
+          "description": "Models pulled on first boot (comma-separated).",
+          "required": false
+        },
+        "OLLAMA_CONTEXT_LENGTH": {
+          "defaultValue": "16384",
+          "description": "Context window: room for Odysseus' tool schemas, memory and search results.",
+          "required": false
+        },
+        "OLLAMA_FLASH_ATTENTION": {
+          "defaultValue": "1",
+          "description": "Flash attention, needed for the quantized KV cache below.",
+          "required": false
+        },
+        "OLLAMA_KV_CACHE_TYPE": {
+          "defaultValue": "q8_0",
+          "description": "8-bit KV cache: halves context memory with little quality loss.",
+          "required": false
+        },
+        "OLLAMA_NUM_PARALLEL": {
+          "defaultValue": "1",
+          "description": "One request at a time (CPU); keeps memory predictable.",
+          "required": false
+        },
+        "OLLAMA_MAX_LOADED_MODELS": {
+          "defaultValue": "1",
+          "description": "Keep one model in memory.",
+          "required": false
+        },
+        "OLLAMA_KEEP_ALIVE": {
+          "defaultValue": "30m",
+          "description": "Unload the model after 30 idle minutes to free RAM.",
+          "required": false
+        }
+      }
+    }
+  },
+  "buckets": []
+}
