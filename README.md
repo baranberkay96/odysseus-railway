@@ -1,5 +1,7 @@
 # Deploy and Host Odysseus with Railway
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/odysseus-v1-private-ai-workspace?referralCode=20H68q)
+
 Odysseus is an open-source, self-hosted AI workspace: chat with local or cloud models, agents with tools, deep research, persistent memory, documents, notes, tasks, calendar and email in one web app. This template deploys Odysseus with private web search, a vector store, push alerts and a local model, ready to chat without an API key.
 
 ## About Hosting Odysseus
